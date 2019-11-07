@@ -3,17 +3,19 @@ package com.littlegreens.netty.client.handler;
 import android.util.Log;
 
 import com.littlegreens.netty.client.listener.NettyClientListener;
+import com.littlegreens.netty.client.protobuf.FollowersPlus;
 import com.littlegreens.netty.client.status.ConnectState;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 
 
-public class NettyClientHandler extends SimpleChannelInboundHandler<String> {
+public class NettyClientHandler extends ChannelInboundHandlerAdapter {
 
     private static final String TAG = "NettyClientHandler";
     private final boolean isSendheartBeat;
@@ -93,16 +95,18 @@ public class NettyClientHandler extends SimpleChannelInboundHandler<String> {
         // NettyTcpClient.getInstance().reconnect();
     }
 
-    /**
-     * 客户端收到消息
-     *
-     * @param channelHandlerContext ChannelHandlerContext
-     * @param msg                   消息
-     */
+
+//    @Override
+//    protected void channelRead0(ChannelHandlerContext channelHandlerContext, String msg) {
+//        Log.e(TAG, "channelRead0:");
+//        listener.onMessageResponseClient(msg, index);
+//    }
+
     @Override
-    protected void channelRead0(ChannelHandlerContext channelHandlerContext, String msg) {
-        Log.e(TAG, "channelRead0:");
-        listener.onMessageResponseClient(msg, index);
+    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+        if (msg instanceof FollowersPlus.PBMessage) {
+            listener.onMessageResponseClient(msg, index);
+        }
     }
 
     /**

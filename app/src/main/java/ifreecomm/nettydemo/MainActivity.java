@@ -14,12 +14,15 @@ import android.widget.Toast;
 import com.littlegreens.netty.client.listener.MessageStateListener;
 import com.littlegreens.netty.client.listener.NettyClientListener;
 import com.littlegreens.netty.client.NettyTcpClient;
+import com.littlegreens.netty.client.protobuf.FollowersPlus;
 import com.littlegreens.netty.client.status.ConnectState;
+
+import java.util.UUID;
 
 import ifreecomm.nettydemo.adapter.LogAdapter;
 import ifreecomm.nettydemo.bean.LogBean;
 
-public class MainActivity extends AppCompatActivity implements View.OnClickListener, NettyClientListener<String> {
+public class MainActivity extends AppCompatActivity implements View.OnClickListener, NettyClientListener<FollowersPlus.PBMessage> {
 
     private static final String TAG = "MainActivity";
     private Button mClearLog;
@@ -45,7 +48,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 .setTcpPort(Const.TCP_PORT) //设置服务端端口号
                 .setMaxReconnectTimes(5)    //设置最大重连次数
                 .setReconnectIntervalTime(5)    //设置重连间隔时间。单位：秒
-                .setSendheartBeat(true) //设置是否发送心跳
+                .setSendheartBeat(false) //设置是否发送心跳
                 .setHeartBeatInterval(5)    //设置心跳间隔时间。单位：秒
                 .setHeartBeatData(new byte[]{0x03, 0x0F, (byte) 0xFE, 0x05, 0x04, 0x0a}) //设置心跳数据，可以是String类型，也可以是byte[]
 //                .setHeartBeatData("I'm is HeartBeatData") //设置心跳数据，可以是String类型，也可以是byte[]，以后设置的为准
@@ -91,16 +94,32 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 if (!mNettyTcpClient.getConnectStatus()) {
                     Toast.makeText(getApplicationContext(), "未连接,请先连接", Toast.LENGTH_SHORT).show();
                 } else {
-                    final String msg = mSendET.getText().toString();
-                    if (TextUtils.isEmpty(msg.trim())) {
-                        return;
-                    }
-                    mNettyTcpClient.sendMsgToServer(msg, new MessageStateListener() {
+//                    final String msg = mSendET.getText().toString();
+//                    if (TextUtils.isEmpty(msg.trim())) {
+//                        return;
+//                    }
+                    FollowersPlus.PBMessage.Builder builder = FollowersPlus.PBMessage.newBuilder();
+
+                    FollowersPlus.PBMessageID.Builder pbmsgbd = FollowersPlus.PBMessageID.newBuilder();
+                    pbmsgbd.setApiType(FollowersPlus.PBAPIType.FetchAppParams);
+                    pbmsgbd.setDialogUUID(UUID.randomUUID().toString());
+                    builder.setMessageID(pbmsgbd);
+
+                    FollowersPlus.PBIdentity.Builder identity = FollowersPlus.PBIdentity.newBuilder();
+                    identity.setSocialPlatformID(FollowersPlus.PBSocialPlatformType.Instagram);
+                    identity.setAppID(FollowersPlus.PBAppType.FollowersPlus);
+                    builder.setIdentity(identity);
+
+                    FollowersPlus.PBFetchAppParamsRequest.Builder requestBuilder = FollowersPlus.PBFetchAppParamsRequest.newBuilder();
+                    requestBuilder.setAppVersion("3.2.7");
+                    builder.setPayload(requestBuilder.build().toByteString());
+
+                    mNettyTcpClient.sendMsgToServer(builder.build(), new MessageStateListener() {
                         @Override
                         public void isSendSuccss(boolean isSuccess) {
                             if (isSuccess) {
                                 Log.d(TAG, "Write auth successful");
-                                logSend(msg);
+//                                logSend(msg);
                             } else {
                                 Log.d(TAG, "Write auth error");
                             }
@@ -130,9 +149,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     @Override
-    public void onMessageResponseClient(String msg, int index) {
-        Log.e(TAG, "onMessageResponse:" + msg);
-        logRece(index + ":" + msg);
+    public void onMessageResponseClient(FollowersPlus.PBMessage msg, int index) {
+        try {
+            byte[] inByte = msg.getPayload().toByteArray();
+            // 字节转成对象
+            FollowersPlus.PBFetchAppParamsReply pbFetchAppParamsReply = FollowersPlus.PBFetchAppParamsReply.parseFrom(inByte);
+            logRece(index + ":" + pbFetchAppParamsReply.getParamsCount());
+        } catch (Exception e) {
+            System.out.println(e.getLocalizedMessage());
+        }
+
     }
 
     @Override

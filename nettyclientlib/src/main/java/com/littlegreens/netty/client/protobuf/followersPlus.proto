@@ -1,0 +1,1246 @@
+syntax = "proto3";
+enum PBAPIType {
+
+    // Login, connections [0...9]
+    PostNotification = 0;
+    Login = 1;
+    Logout = 2;
+    RefreshConnection = 3;
+    ReloadSettings = 4;
+    FetchAppParams = 5;
+    UpdateOneSignalPlayerID = 6; // OneSignal Push Notification
+    FetchConfig = 7; // Params, FeatureLists - ON/OFF, PBProduct, 和其他只跟版本有关的东西
+
+    // Products [10...19]
+    FetchProducts = 10;
+    ValidateTransaction = 11;
+    FetchVIPProducts = 12;
+    BuyVIPProduct = 13;
+    FetchUserPurchaseHistory = 14;
+    VerifySubscription = 15;
+
+    // Gifts [20...29]
+    FetchGifts = 20;
+    DoGift = 21;
+    VIPPitch = 22;
+
+    // OneSignal notification
+    PostOneSignalNotification = 29;
+
+    // User Settings
+    FetchUserSettings = 30;
+    PostUserSettings = 31;
+    //Task
+    DispatchTask = 100;
+    PostTask = 101;
+    SpawnTask = 102;
+
+    //Task Capability: client -> server
+    PostTaskCapability = 105;
+
+    //Task Progress
+    FetchTaskProgress = 108;
+
+    //Data
+    FetchCountData = 110;
+    FetchAccountListData = 111;
+    FetchMostEngagingMedias = 112;
+    FetchSpotlightData = 113;
+    FetchHistoryCounts = 114;
+    FetchAccountRelations = 115;
+    FetchProfileViewers = 116;
+    FetchEngagedMedias = 117;
+
+    // S2C only Notifications [150...199]
+    PostTextNotification = 150;
+    PostChangeNotifcation = 151;
+    PostCountDataNotification = 152;
+    PostPendingBatchTaskTargetDelta = 153;
+    PostBatchTaskCompleteNotification = 154;
+    TransferExistingServerBatchTasksToClient = 155;
+
+    //Subscription
+    ValidateSubscription = 200;
+
+    //Premium check
+    IsPremium = 300;
+
+    //Report page elements
+    ReportPage = 400;
+
+    //Batch task
+    FetchBatchTask = 500;
+    UpdateBatchTask = 501;
+
+    FetchPendingBatchTaskTargets = 510;
+
+    //Proxied content fetch
+    ProxiedFetchContent = 600;
+}
+
+////////////////////////////////////////////////////////////////
+/// General Message
+////////////////////////////////////////////////////////////////
+enum PBErrorCode {
+    Success = 0;
+    UnknownError = 1;
+    ParamError = 2;
+    AuthError = 3;
+    NotExist = 4;
+    Disabled = 5;
+    ConnectionClosed = 6;
+    NotImplemented = 7;
+    TooManyRequests = 8;
+    Unavailable = 9;
+    Redirected = 10;
+}
+
+enum PBSocialPlatformType {
+    Instagram = 0;
+}
+
+enum PBAppType {
+    SanTi = 0; //com.fansup.santi
+    FollowersPlus = 1; //com.fansup.followersplus
+    IGtrack = 2;
+}
+
+
+// Only common APIs can be defined here [0...29]
+
+message PBMessageID
+{
+    PBAPIType apiType = 1;
+    int64 index = 2 [deprecated=true];
+
+    //代替老的 index
+    string dialogUUID = 3;
+}
+
+message PBIdentity {
+    PBSocialPlatformType socialPlatformID = 1;  // Instagram / Twitter / Facebook ...
+    PBAppType appID = 2;
+    int64 userSID = 3;      // Server generated id, int maxID++
+    string accountID = 4;   // Social platform's username / email / phone number...
+}
+
+message PBMessage
+{
+    PBMessageID messageID = 1;
+    string accessToken = 2;
+    PBErrorCode errorCode = 3;
+    bytes payload = 4;
+    PBIdentity identity = 5;
+    string errorMessage = 6;
+
+    // 默认false，表示一问一答，兼容老客户端。客户端设置为true时，表示发起了一个一问多答的对话，仅新客户端支持
+    // 下面以 mutualFollowing 为例：
+    // 服务器检测到客户端设置了true，则回答时应该参考calculationInProgress，最后一个回答时设置toBeContinued=false
+    // 如果客户端设置了toBeContinued=false，那么说明是老客户端，则直接关闭对话，释放资源，走老的通信模式。
+    // 如果一个正在工作中的dialog，客户端由于某些原因，比如离开了某个界面，需要主动终止对话，则会发送一个空的PBMessage，
+    // messageID为需要终止的dialog的值，其中设置了toBeContinued=fasle
+    // 如果一个正在工作中的dialog，由于第三方的原因比如网络断开，服务器需要主动终止对话；如有业务需要，客户端在重连的时候会发起一个新的dialog
+    bool toBeContinued = 7;
+}
+
+message PBNotification
+{
+    PBAPIType notificationAPI = 1; // FetchAccountListData／FetchCountData
+    bytes objectData = 2; // PBFetchAccountListDataReply/PBXXX...
+    bool broadcast = 3;
+    bool mustDelivered = 4;
+}
+
+
+////////////////////////////////////////////////////////////////
+/// App specific Message
+////////////////////////////////////////////////////////////////
+message PBFetchConfigRequest
+{
+    string appVersion = 1;  //3.2.7
+    string appBundleID = 2; //com.fansup.followersplus, com.fansup.followersplus.android
+}
+
+message FeatureConfig
+{
+    PBAccountListDataType type = 1;
+    bool isActive = 2;
+    bool isVIPOnly = 3;
+    bool unlockableByWatchAd = 4;
+}
+
+message PBFetchConfigReply
+{
+    map<string, string> params = 1;
+
+    repeated PBProduct products = 2;
+    repeated FeatureConfig features = 3;
+}
+
+message PBFetchAppParamsRequest
+{
+    string appVersion = 1;
+}
+
+message PBFetchAppParamsReply
+{
+    map<string, string> params = 1;
+}
+
+message PBUpdateOneSignalPlayerIDRequest
+{
+    string oneSignalPlayerID = 1; // User id from OneSignal, can be used in `include_player_ids`:
+}
+
+message PBUpdateOneSignalPlayerIDReply
+{
+
+}
+
+message PBReloadSettingsRequest
+{
+    string adminUsername = 1;
+}
+
+message PBReloadSettingsReply
+{
+
+}
+
+////////////////////////////////////////////////////////////////
+/// Products
+////////////////////////////////////////////////////////////////
+
+message PBSubcription
+{
+    string productID = 1;
+    int64 purchaseDate = 2;
+    int64 expiresDate = 3;
+    bool isTrialPeriod = 4;
+}
+
+message PBTransaction
+{
+    PBProduct product = 1;  // The client will only set productID, but when return from the server, it must set all fields.
+    string transactionID = 2;
+    string receipt = 3;
+
+    // Filled by server
+    bool valid = 4;
+    bool alreadyProcessed = 5;
+
+    string jsonParams = 6; // coupon/promotion/bonus...
+
+    int64 status = 7;//receipt verify status returned by Apple
+
+    bool hasTrial = 8;
+
+    PBSubcription activeSubscription = 9;
+}
+
+message PBValidateTransactionRequest // From Client -> FUServer - ServerB
+{
+    PBTransaction transaction = 1;
+}
+
+message PBValidateTransactionReply // From ServerB -> FUServer -> Client
+{
+    repeated PBTransaction transactions = 1; // There may be several transactions succeeded
+    PBProduct product = 2;
+}
+
+/// Refactor using https://github.com/bizz84/SwiftyStoreKit
+message PBVerifySubscriptionRequest
+{
+    bytes receipt = 1;
+}
+
+enum PBVerifySubscriptionResult
+{
+    notPurchased = 0;   // 从没花过钱，也没试用过
+    subscribed = 1;     // 当前是VIP
+    expired = 2;        // 之前订阅过（包括试用的形式），现在没有订阅了
+    receiptError = 3;   // ...
+}
+
+message PBVerifySubscriptionReply
+{
+    PBVerifySubscriptionResult result = 1; // 只有这里等于subscribed，下面三个字段才有意义
+    int64 expiryTimestamp = 2;
+    bool isInFreeTrial = 3; // 试用期讨好客户用
+    BillingCycle billingCycle = 4;
+    bool isSandbox = 5;
+}
+
+message PBFetchUserPurchaseHistoryRequest
+{
+    string accountIDOfTargetUser = 1;
+}
+
+message PBUserPurchaseUnit
+{
+    string productID = 1;
+    int64 timestamp = 2;
+    int64 coins = 3;
+    int64 price = 4;
+}
+
+message PBFetchUserPurchaseHistoryReply
+{
+    PBUserPurchaseUnit units = 1;
+    int64 coins = 2;
+}
+
+message PBPostOneSignalNotification
+{
+    string notificationMessage = 1;
+    string jsonParams = 2;
+    repeated string targetOneSignalPlayerIDs = 3;
+}
+
+message PBFetchUserSettingsRequest
+{
+
+}
+
+message PBFetchUserSettingsReply
+{
+    map<string, string> userSettings = 1;
+}
+
+message PBPostUserSettingsRequest
+{
+    map<string, string> userSettings = 1;
+}
+
+message PBPostUserSettingsReply
+{
+
+}
+
+// [101-199]
+
+message PBPagination
+{
+    int64 pageNumber = 1;
+    int64 pageSize = 2;
+}
+
+////////////////////////////////////////////////////////////////
+/// App unified Messages
+////////////////////////////////////////////////////////////////
+enum PBLoginType
+{
+    PBLoginType_App = 0;
+    PBLoginType_Bot = 1;
+    PBLoginType_Bridge = 2;
+    PBLoginType_BatchTask = 3;
+    PBLoginType_ProxiedFetch = 4;
+}
+
+message PBLoginRequest
+{
+    string appVersion = 1;      // 1.0.0
+    string countryName = 2;     // United States
+    string countryCode = 3;     // US
+    string preferredLang = 4;   // en-US
+    string idfa = 5;            // E036BBB7-76DC-46CE-AA62-55CF182C5FAD
+    int64 timezone = 6;         // 8, East 8th
+    PBAccount account = 7;      // account information
+    PBLoginType loginType = 8;
+    string cookie = 9;
+}
+
+message PBLoginReply
+{
+    int64 createTs = 1;
+    bool isOldVIP = 2;
+}
+
+message PBLogoutRequest
+{
+
+}
+
+message PBLogoutReply
+{
+
+}
+
+message PBRefreshConnectionRequest
+{
+    PBAccount account = 1;
+    PBLoginType loginType = 2;
+    string appVersion = 3;
+}
+
+message PBRefreshConnectionReply
+{
+    int64 createTs = 1;
+    bool isOldVIP = 2;
+}
+
+////////////////////////////////////////////////////////////////
+/// Products
+////////////////////////////////////////////////////////////////
+// Check out: https://developer.apple.com/app-store/subscriptions/
+
+enum BillingCycle
+{
+    weekly = 0;
+    oneMonth = 1;
+    twoMonth = 2;
+    threeMonth = 3;
+    halfYearly = 4;
+    yearly = 5;
+    lifetime = 6;   // Can be used for non-consumables
+}
+
+enum IntroductoryOfferPaymentOption
+{
+    freeTrial = 0; // Normally we use this.
+    payAsYouGo = 1;
+    payUpFront = 2;
+}
+
+message IntroductoryOffer
+{
+    IntroductoryOfferPaymentOption paymentOption = 1;
+    int64 durationInDays = 2; // To express 1 month = 30, half year = 180, 1 year = 365
+    double priceInUSD = 3;
+}
+
+message PromotionalOffer
+{
+
+}
+
+// PBProduct must fully reflects the setting in ITC and in sync
+// To support old versions of F+, all fields including `deprecated` must be filled with correct values.
+message PBProduct
+{
+    string productID = 1;
+    int64 price = 2 [deprecated=true];
+    int64 months = 3 [deprecated=true];
+    BillingCycle billingCycle = 4;
+    double standardPriceInUSD = 5; //$4.99
+    int64 discountDescription = 6; //70 means 70% OFF. We hard code this to make it more flexible.
+
+    IntroductoryOffer introductoryOffer = 7;
+}
+
+message PBFetchProductsRequest
+{
+    string appVersion = 1;
+}
+
+message PBFetchProductsReply
+{
+    repeated PBProduct products = 1;
+}
+
+////////////////////////////////////////////////////////////////
+/// Basic Data
+////////////////////////////////////////////////////////////////
+message PBAccount
+{
+    string accountID = 1;
+    string username = 2;
+    string password = 3;
+
+    bool isPrivateAccount = 4;
+
+    int64 mediaCount = 5;
+    int64 followingCount = 6;
+    int64 followerCount = 7;
+
+    string fullName = 8;
+    string avatarURLString = 9;
+
+    int64 gender = 10;
+    string emailAddress = 11;
+    string biography = 12;
+    string websiteURLString = 13;
+
+    string countryCode = 14;
+    PBLocation location = 15;
+
+    PBRelationship relationshipToThisAccount = 16;
+
+    repeated PBMedia recentMedias = 17;
+
+    PBRelationship relationshipFromThisAccount = 18;
+
+    string phoneNumber = 19;
+
+    bool needToUpdateBasicInfo = 20;
+    bool needToUpdateMedias = 21;
+
+    double charmValue = 22;
+
+    bool hasAnonymousProfilePicture = 23;
+
+    PBAccountLoginType accountLoginType = 24;
+}
+
+enum PBAccountLoginType
+{
+    InstagramLogin = 0;
+    FacebookLogin = 1;
+}
+
+message PBLocation
+{
+    double latitude = 1;
+    double longitude = 2;
+
+    string name = 3;
+    string address = 4;
+}
+
+enum PBMediaType
+{
+    PBMediaType_None = 0;
+    PBMediaType_Photo = 1;
+    PBMediaType_Video = 2;
+    PBMediaType_Carousel = 8;
+}
+
+message PBMedia
+{
+    message PBURLVersion
+    {
+        int64 width = 1;
+        int64 height = 2;
+        string urlString = 3;
+
+        int64 videoType = 4; // Unsure what it is, may be related to video encoding.
+    }
+
+    string mediaID = 1;
+    PBMediaType mediaType = 2;
+
+    PBLocation location = 3;
+    int64 likeCount = 4;
+    int64 commentCount = 5;
+    int64 createTime = 6;
+
+    PBAccount owner = 7;
+    PBRelationship relationshipToOwner = 8;
+    repeated PBAccount accountsInMedia = 9;
+    string text = 10;
+    string filter = 11;
+    repeated string tags = 12;
+    repeated PBURLVersion imageURLVersions = 13;
+    repeated PBURLVersion videoURLVersions = 14;
+
+    repeated PBComment previewComments = 15;
+
+    string mediaCode = 16;
+    int64 videoViews = 17;
+}
+
+message PBComment
+{
+    string commentID = 1;
+    int64 commentTime = 2;
+    string text = 3;
+    PBAccount commenter = 4;
+}
+
+////////////////////////////////////////////////////////////////
+/// Tasks
+////////////////////////////////////////////////////////////////
+enum PBTaskType
+{
+    PBTaskType_Noop = 0;
+    PBTaskType_FetchAccountInfo = 1;
+    PBTaskType_FetchMediaLikes = 2;
+    PBTaskType_FetchMediaComments = 3;
+    PBTaskType_FetchAccountFollowings = 4;
+    PBTaskType_FetchAccountFollowers = 5;
+    PBTaskType_FetchAccountMedias = 6;
+    PBTaskType_FetchAccountLikedMedias = 7;
+    PBTaskType_FetchAccountBlockings = 8;
+    PBTaskType_FetchAccountRelation = 9;
+    PBTaskType_FetchAccountActivities = 10;
+    PBTaskType_FetchAccountStories = 11;
+    PBTaskType_FetchMediaInfo = 12;
+    //special task
+    PBTaskType_RefreshAccountInfluentialFollowers = 100;
+}
+
+enum PBTaskState
+{
+    PBTaskState_Pending = 0;
+    PBTaskState_Success = 1;
+    PBTaskState_Failure = 2;
+}
+
+enum PBTaskFailureAction
+{
+    PBTaskFailureAction_DispatchToOther = 0;
+    PBTaskFailureAction_DispatchToSelf = 1;
+    PBTaskFailureAction_DeleteTask = 2;
+}
+
+message PBTaskContentFetchAccountInfo
+{
+    string accountID = 1;
+    PBAccount account = 2;
+}
+
+message PBTaskContentFetchAccountMedias
+{
+    string accountID = 1;
+    string cursor = 2;
+    repeated PBMedia medias = 3;
+    int64 currentCount = 4;
+}
+
+message PBTaskContentFetchMediaLikers
+{
+    string mediaID = 1;
+    string cursor = 2;
+    repeated PBAccount likers = 3;
+    int64 currentCount = 4;
+    int64 totalCount = 5;
+    string mediaCode = 6;
+    string ownerID = 7;
+}
+
+message PBTaskContentFetchMediaComments
+{
+    string mediaID = 1;
+    string cursor = 2;
+    repeated PBComment comments = 3;
+    int64 currentCount = 4;
+    int64 totalCount = 5;
+    string mediaCode = 6;
+    string ownerID = 7;
+}
+
+message PBTaskContentFetchAccountFollowers
+{
+    string accountID = 1;
+    string cursor = 2;
+    repeated PBAccount followers = 3;
+    int64 currentCount = 4;
+    bool withExtendedInfo = 5;
+}
+
+message PBTaskContentFetchAccountLikedMedias
+{
+    string accountID = 1;
+    string cursor = 2;
+    repeated PBMedia medias = 3;
+    int64 currentCount = 4;
+}
+
+message PBTaskContentFetchAccountFollowings
+{
+    string accountID = 1;
+    string cursor = 2;
+    repeated PBAccount followings = 3;
+    int64 currentCount = 4;
+    bool withExtendedInfo = 5;
+}
+
+message PBTaskContentFetchAccountBlockings
+{
+    message BlockingInfo
+    {
+        PBAccount account = 1;
+        int64 blockTime = 2;
+    }
+
+    string accountID = 1;
+    string cursor = 2;
+    repeated BlockingInfo blockings = 3;
+    int64 currentCount = 4;
+}
+
+message PBTaksContentFetchAccountRelation
+{
+    string sourceAccountID = 1;
+    string targetAccountID = 2;
+    PBRelationship relation = 3;
+}
+
+enum PBActivityType
+{
+    PBActivityType_Null = 0;
+    PBActivityType_Like = 1;
+    PBActivityType_Comment = 2;
+    PBActivityType_Follow = 3;
+}
+
+message PBTaskContentFetchAccountActivities
+{
+    message Activity
+    {
+        PBActivityType type = 1;
+        PBAccount targetAccount = 2;
+        PBMedia media = 3;
+        int64 timestamp = 4;
+    }
+
+    string accountID = 1;
+    int64 startTimestamp = 2;
+    repeated Activity activities = 3;
+}
+
+message PBTaksContentFetchAccountStories
+{
+    message StoryElement
+    {
+        PBMedia story = 1;
+        repeated PBAccount viewers = 2;
+    }
+
+    string accountID = 1;
+    repeated StoryElement stories = 2;
+}
+
+message PBTaskContentFetchMediaInfo
+{
+    PBMedia media = 1;
+}
+
+message PBTask
+{
+    PBTaskType taskType = 1;
+    uint64 taskID = 2;
+    PBTaskState taskState = 3;
+    PBTaskFailureAction failureAction = 4;
+    oneof taskContent
+    {
+        PBTaskContentFetchAccountInfo contentFetchAccountInfo = 5;
+        PBTaskContentFetchMediaLikers contentFetchMediaLikers = 6;
+        PBTaskContentFetchMediaComments contentFetchMediaComments = 7;
+        PBTaskContentFetchAccountFollowings contentFetchFollowings = 8;
+        PBTaskContentFetchAccountFollowers contentFetchFollowers = 9;
+        PBTaskContentFetchAccountMedias contentFetchAccountMedias = 10;
+        PBTaskContentFetchAccountLikedMedias contentFetchLikedMedias = 11;
+        PBTaskContentFetchAccountBlockings contentFetchBlockings = 12;
+        PBTaksContentFetchAccountRelation contentFetchAccountRelation = 13;
+        PBTaskContentFetchAccountActivities contentFetchAccountActivities = 14;
+        PBTaksContentFetchAccountStories contentFetchAccountStories = 15;
+        PBTaskContentFetchMediaInfo contentFetchMediaInfo = 16;
+    }
+    string executorAccountID = 30;
+    string executorCookie = 31;
+}
+
+message PBSpawnTaskRequest
+{
+    message SpawnDetail
+    {
+        PBTaskType taskType = 1;
+        bool forceSpawn = 2;
+    }
+    repeated SpawnDetail details = 1;
+}
+
+enum PBSpawnTaskStatus
+{
+    PBSpawnTaskStatus_OK = 0;
+    PBSpawnTaskStatus_InProgress = 1;
+    PBSpawnTaskStatus_Error = 2;
+}
+
+message PBSpawnTaskReply
+{
+    message SpawnResult
+    {
+        PBTaskType taskType = 1;
+        PBSpawnTaskStatus spawnStatus = 2;
+    }
+    repeated SpawnResult results = 1;
+}
+
+message PBTaskCapability
+{
+    repeated PBTaskType taskTypes = 1;
+}
+
+enum PBTaskProgressType
+{
+    PBTaskProgressType_None = 0;
+    PBTaskProgressType_FollowingList = 1;
+    PBTaskProgressType_FollowingInfo = 2;
+    PBTaskProgressType_FollowerList = 3;
+    PBTaskProgressType_FollowerInfo = 4;
+    PBTaskProgressType_MediaList = 5;
+    PBTaskProgressType_MediaLike = 6;
+    PBTaskProgressType_MediaComment = 7;
+    PBTaskProgressType_LikedMedia = 8;
+    PBTaskProgressType_BlockingList = 9;
+}
+
+message PBFetchTaskProgressRequest
+{
+
+}
+
+message PBFetchTaskProgressReply
+{
+    message TaskProgress
+    {
+        PBTaskProgressType type = 1;
+        int64 totalCount = 2;
+        int64 finishedCount = 3;
+    }
+    repeated TaskProgress progresses = 1;
+    int64 pageProgress = 2;//max 100
+}
+
+////////////////////////////////////////////////////////////////
+/// App Fetch Data
+////////////////////////////////////////////////////////////////
+enum PBCountDataType
+{
+    PBCountDataType_None = 0;
+    PBCountDataType_TotalLikes = 1;
+    PBCountDataType_MutualFollowing = 2;
+    PBCountDataType_NotFollowingMeBack = 3;
+    PBCountDataType_ImNotFollowingBack = 4;
+    PBCountDataType_TotalComments = 5;
+    PBCountDataType_TotalPhotos = 6;
+    PBCountDataType_TotalVideos = 7;
+    PBCountDataType_TotalCarousels = 8;
+    PBCountDataType_TotalPhotoLikes = 9;
+    PBCountDataType_TotalVideoLikes = 10;
+    PBCountDataType_TotalCarouselLikes = 11;
+    PBCountDataType_TotalPhotoComments = 12;
+    PBCountDataType_TotalVideoComments = 13;
+    PBCountDataType_TotalCarouselComments = 14;
+    PBCountDataType_TotalMedias = 15;
+    PBCountDataType_TotalUnlikesAndUnComments = 16;
+    PBCountDataType_TotalBlockings = 17;
+    PBCountDataType_MediaMaxLikes = 18;
+    PBCountDataType_MediaMaxComments = 19;
+    PBCountDataType_CommentedAccounts = 20;
+    PBCountDataType_UnfollowedFromMutualFollowings = 21;
+    PBCountDataType_CurrentLostFollowers = 22;
+}
+
+message PBFetchCountDataRequest
+{
+    string accountID = 1;
+    PBCountDataType dataType = 2;
+}
+
+message PBFetchCountDataReply
+{
+    int64 count = 1;
+    int64 delta = 2 [deprecated=true]; //deprecated
+    bool calculationInProgress = 3;
+}
+
+enum PBRelationship
+{
+    PBRelationship_Null = 0;
+    PBRelationship_Follow = 1;
+    PBRelationship_Block = 2;
+    PBRelationship_Requested = 3;
+    PBRelationship_NoRelation = 4;
+}
+
+enum PBRelationshipToMedia
+{
+    PBRelationshipToMedia_Null = 0;
+    PBRelationshipToMedia_Like = 1;
+    PBRelationshipToMedia_Comment = 2;
+}
+
+message PBAccountListElement
+{
+    message MediaWithRelation
+    {
+        PBMedia media = 1;
+        PBRelationshipToMedia relation = 2;
+    }
+
+    PBAccount targetAccount = 1;
+    PBRelationship outgoingRelation = 2;
+    PBRelationship incomingRelation = 3;
+    int64 likeCount = 4; // targetAccount like/comment me || I like/comment targetAccount
+    int64 commentCount = 5;
+    int64 followerCount = 6 [deprecated=true];
+    int64 incomingActionTime = 7;
+    PBMedia media = 8;//for unlike uncomment
+    repeated MediaWithRelation relatedMedias = 9;
+    bool needToUpdateRelations = 10;
+    string content = 11;//for uncomment
+    int64 score = 12;//for who admires me
+}
+
+enum PBAccountListDataType
+{
+    PBAccountListDataType_None = 0;
+    PBAccountListDataType_MostLoyal = 1;
+    PBAccountListDataType_MostFriendly = 2;
+    PBAccountListDataType_MostTalkative = 3;
+    PBAccountListDataType_MutualFollowing = 4;
+    PBAccountListDataType_NoLikeGiven = 5;
+    PBAccountListDataType_NoCommentLeft = 6;
+    PBAccountListDataType_NoCommentOrLikes = 7;
+    PBAccountListDataType_BlockingMe = 8;
+    PBAccountListDataType_LikedNotFollowing = 9;
+    PBAccountListDataType_NotFollowingMeBack = 10;
+    PBAccountListDataType_ImNotFollowingBack = 11;
+    PBAccountListDataType_SecretAdmirers = 12;
+    PBAccountListDataType_InfluentialFollowers = 13;
+    PBAccountListDataType_GainedFollowers = 14;
+    PBAccountListDataType_LostFollowers = 15;
+    PBAccountListDataType_ProfileViewers = 16;
+    PBAccountListDataType_FavouriteUsers = 17;
+    PBAccountListDataType_EarliestFollowers = 18;
+    PBAccountListDataType_LatestFollowers = 19;
+    PBAccountListDataType_Unlike = 20;
+    PBAccountListDataType_Uncomment = 21;
+    PBAccountListDataType_MyUnFollowed = 22;
+    PBAccountListDataType_WhoAdmiresMe = 23;
+    PBAccountListDataType_UnfollowedFromMutualFollowings = 24;
+}
+
+message PBFetchAccountListDataRequest
+{
+    string accountID = 1;
+    PBAccountListDataType dataType = 2;
+    PBPagination pagination = 3;
+    int64 startTime = 4;//Only for Gained/Lost
+    int64 endTime = 5;//Only for Gained/Lost
+    bool noRelatedMedias = 6;
+}
+
+message PBFetchAccountListDataReply
+{
+    PBPagination pagination = 1;
+    repeated PBAccountListElement elements = 2;
+    bool calculationInProgress = 3;
+    int64 totalDataCount = 4; // Gained and lost followers uses this
+    int64 maxScore = 5;//for WhoAdmiresMe
+}
+
+enum PBMediaEngagingType
+{
+    EngagingType_All = 0;
+    EngagingType_Like = 1;
+    EngagingType_Comment = 2;
+}
+
+message PBFetchMostEngagingMediasRequest
+{
+    string accountID = 1;
+    PBMediaType mediaType = 2;
+    int64 recentDays = 3;//ignored if startTime/endTime available
+    PBPagination pagination = 4;
+    PBMediaEngagingType engagingType = 5;
+    int64 startTime = 6;
+    int64 endTime = 7;
+}
+
+message PBFetchMostEngagingMediasReply
+{
+    PBPagination pagination = 1;
+    repeated PBMedia medias = 2;
+    bool calculationInProgress = 3;
+}
+
+message PBFetchEngagedMediasRequest
+{
+    string accountID = 1;
+    string targetAccountID = 2;
+    PBMediaEngagingType engagingType = 3;
+    PBPagination pagination = 4;
+}
+
+message PBFetchEngagedMediasReply
+{
+    message EngagedMedia
+    {
+        PBMedia media = 1;
+        PBMediaEngagingType engagingType = 2;
+    }
+    PBPagination pagination = 1;
+    repeated EngagedMedia medias = 2;
+    bool calculationInProgress = 3;
+}
+
+message PBFetchSpotlightDataRequest
+{
+    string accountID = 1;
+    string targetAccountID = 2;
+}
+
+message PBFetchSpotlightDataReply
+{
+    int64 likeCountFromTargetAccount = 1;
+    int64 commentCountFromTargetAccount = 2;
+    repeated PBMedia mostLikedMediasOwnedByTargetAccount = 3 [deprecated = true];//up to 9
+}
+
+enum PBFetchHistoryCountType
+{
+    PBFetchHistoryCountType_Follower = 0;
+    PBFetchHistoryCountType_Following = 1;
+    PBFetchHistoryCountType_Media = 2;
+    PBFetchHistoryCountType_MediaLikes = 3;
+    PBFetchHistoryCountType_MediaComments = 4;
+}
+
+message PBFetchHistoryCountRequest
+{
+    string accountID = 1;
+    PBFetchHistoryCountType type = 2;
+    int64 startTime = 3;
+    int64 endTime = 4;
+}
+
+message PBFetchHistoryCountReply
+{
+    message CountData
+    {
+        int64 count = 1;
+        int64 time = 2;
+    }
+    repeated CountData counts = 1;
+}
+
+message PBFetchAccountRelationsRequest
+{
+    string accountID = 1;
+    repeated string targetAccountIDs = 2;
+}
+
+message PBFetchAccountRelationsReply
+{
+    message RelationData
+    {
+        PBRelationship outgoingRelation = 1;
+        PBRelationship incomingRelation = 2;
+        bool needToUpdateRelations = 3;
+    }
+    map<string, RelationData> relationMap = 1;
+}
+
+message PBProfileViewerElement
+{
+	PBAccountListElement viewer = 1;
+    int64 viewCount = 2;
+}
+
+message PBFetchProfileViewersRequest
+{
+    string accountID = 1;
+    int64 startTime = 2;
+    int64 endTime = 3;
+    bool noRelatedMedias = 4;
+}
+
+message PBFetchProfileViewersReply
+{
+    message ViewerData
+    {
+        int64 viewDateTime = 1;
+        repeated PBProfileViewerElement elements = 2;
+    }
+
+    repeated ViewerData dataArray = 1;
+}
+
+//Notifications
+message PBPostTextNotification
+{
+    string title = 1;
+    string content = 2;
+}
+
+enum PBChangeType
+{
+    PBChangeType_None = 0;
+    PBChangeType_ProfileView = 1;
+    PBChangeType_Blocking = 2;
+    PBChangeType_Unfollow = 3;
+    PBChangeType_Unlike = 4;
+    PBChangeType_Uncomment = 5;
+    PBChangeType_Admires = 6;
+}
+
+message PBPostChangeNotification
+{
+    PBChangeType changeType = 1;
+    int64 changeCount = 2;
+    bool isAccumulated = 3;
+    int64 sinceTime = 4;
+    string accountID = 5;
+}
+
+//Subscription
+message PBValidateSubscriptionRequest
+{
+
+}
+
+message PBValidateSubscriptionReply
+{
+    bool status = 1;
+}
+
+message PBIsPremiumRequest
+{
+    repeated PBAccountListDataType types = 1;//if not filled, server must return all possible types
+}
+
+message PBIsPremiumReply
+{
+    message PremiumInfo
+    {
+        PBAccountListDataType type = 1;
+        bool isPremium = 2;
+    }
+    repeated PremiumInfo premiums = 1;
+}
+
+message PBReportPageRequest
+{
+    repeated PBCountDataType countElements = 1;
+    repeated PBAccountListDataType listElements = 2;
+    bool urgent = 3;
+    repeated PBCountDataType countExcludeFromProgress = 4;
+    repeated PBAccountListDataType listExcludeFromProgress = 5;
+}
+
+message PBReportPageReply
+{
+    bool spawnedNewTasks = 1;
+    int64 pageProgress = 2;//max 100, -1 for unpredictable
+}
+
+message PBPostCountDataNotification
+{
+    repeated PBCountDataType dataTypes = 1;
+}
+
+// Send only *unfinished* batch tasks to client and pause it on server.
+message PBTransferExistingServerBatchTasksToClientRequest
+{
+
+}
+
+message PBTransferExistingServerBatchTasksToClientReply
+{
+    repeated int64 unfinishedFollowTargetInstagramIDs = 1;
+    repeated int64 unfinishedUnfollowTargetInstagramIDs = 2;
+}
+
+enum PBBatchTaskType
+{
+    PBBatchTaskType_None = 0;
+    PBBatchTaskType_Follow = 1;
+    PBBatchTaskType_Unfollow = 2;
+}
+
+enum PBBatchTaskStatus
+{
+    PBBatchTaskStatus_Pending = 0;
+    PBBatchTaskStatus_Finished = 1;
+    PBBatchTaskStatus_FeedbackRequired = 2;
+    PBBatchTaskStatus_MaxReached = 3;
+}
+
+message PBFetchBatchTaskRequest
+{
+    repeated int64 taskIDs = 1;//empty means all
+}
+
+message PBBatchTaskSummary
+{
+    int64 taskID = 1;
+    PBBatchTaskType taskType = 2;
+    PBBatchTaskStatus taskStatus = 3;
+    int64 totalTargetCount = 4;
+    int64 finishedTargetCount = 5;
+    int64 startTime = 6;
+    int64 endTime = 7;
+    PBAccount firstTargetAccount = 8;
+}
+
+message PBFetchBatchTaskReply
+{
+    repeated PBBatchTaskSummary results = 1;
+}
+
+enum PBUpdateBatchTaskType
+{
+    PBUpdateBatchTaskType_None = 0;
+    PBUpdateBatchTaskType_Add = 1;
+    PBUpdateBatchTaskType_Del = 2;
+    PBUpdateBatchTaskType_Cancel = 3;
+}
+
+message PBUpdateBatchTaskRequest
+{
+    PBUpdateBatchTaskType type = 1;
+    PBBatchTaskType taskType = 2;
+    int64 taskID = 3;//0 means new task
+    repeated int64 targetIDs = 4;
+}
+
+message PBUpdateBatchTaskReply
+{
+    int64 taskID = 1;
+}
+
+message PBFetchPendingBatchTaskTargetsRequest
+{
+    repeated PBBatchTaskType taskTypes = 1;
+}
+
+message PBFetchPendingBatchTaskTargetsReply
+{
+    message PendingBatchTaskTargets
+    {
+        PBBatchTaskType taskType = 1;
+        repeated int64 pendingTargetIDs = 2;
+    }
+    repeated PendingBatchTaskTargets results = 1;
+}
+
+enum PBPostPendingBatchTaskTargetDeltaType
+{
+    PBPostPendingBatchTaskTargetDeltaType_None = 0;
+    PBPostPendingBatchTaskTargetDeltaType_Add = 1;
+    PBPostPendingBatchTaskTargetDeltaType_Del = 2;
+}
+
+message PBPostPendingBatchTaskTargetDelta
+{
+    PBPostPendingBatchTaskTargetDeltaType deltaType = 1;
+    PBBatchTaskType taskType = 2;
+    int64 taskID = 3;
+    string accountID = 4;
+    repeated int64 targetIDs = 5;
+}
+
+message PBPostBatchTaskCompleteNotification
+{
+    string accountID = 1;
+    int64 taskID = 2;
+    PBBatchTaskType taskType = 3;
+    PBBatchTaskStatus taskStatus = 4;//PBBatchTaskStatus_Finished / PBBatchTaskStatus_MaxReached
+    int64 totalTargetCount = 5;
+    int64 finishedTargetCount = 6;
+}
+
+message PBProxiedFetchContent
+{
+    PBTaskType type = 1;
+    string executorAccountID = 2;
+    oneof fetchContent
+    {
+        PBTaskContentFetchAccountInfo contentFetchAccountInfo = 3;
+    }
+}

@@ -17,7 +17,7 @@ android {
     compileSdkVersion 26
 
     defaultConfig {
-        minSdkVersion 18
+        minSdkVersion 19
         targetSdkVersion 26
         versionCode 1
         versionName "1.0"
@@ -37,10 +37,10 @@ android {
         abortOnError false
     }
 
-
 }
 
 dependencies {
-    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation files('libs/netty-all-4.1.23.Final.jar')
+    api files('libs/protobuf-javalite-3.9.1.jar')
 }

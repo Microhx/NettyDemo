@@ -4,8 +4,12 @@ import android.os.SystemClock;
 import android.util.Log;
 
 import com.littlegreens.netty.client.handler.NettyClientHandler;
+import com.littlegreens.netty.client.handler.ProtobufDecoderCustom;
+import com.littlegreens.netty.client.handler.ProtobufVarint32LengthFieldPrependerCustom;
+import com.littlegreens.netty.client.handler.SecondProtobufCodec;
 import com.littlegreens.netty.client.listener.MessageStateListener;
 import com.littlegreens.netty.client.listener.NettyClientListener;
+import com.littlegreens.netty.client.protobuf.FollowersPlus;
 import com.littlegreens.netty.client.status.ConnectState;
 
 import java.util.concurrent.TimeUnit;
@@ -23,10 +27,10 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.LineBasedFrameDecoder;
-import io.netty.handler.codec.string.StringDecoder;
-import io.netty.handler.codec.string.StringEncoder;
+import io.netty.handler.codec.protobuf.ProtobufDecoder;
+import io.netty.handler.codec.protobuf.ProtobufEncoder;
+import io.netty.handler.codec.protobuf.ProtobufVarint32LengthFieldPrepender;
 import io.netty.handler.timeout.IdleStateHandler;
-import io.netty.util.CharsetUtil;
 
 /**
  * Created by littleGreens on 2018-11-10.
@@ -132,7 +136,7 @@ public class NettyTcpClient {
                 isConnecting = true;
                 group = new NioEventLoopGroup();
                 Bootstrap bootstrap = new Bootstrap().group(group)
-                        .option(ChannelOption.TCP_NODELAY, true)//屏蔽Nagle算法试图
+                        .option(ChannelOption.TCP_NODELAY, true)
                         .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000)
                         .channel(NioSocketChannel.class)
                         .handler(new ChannelInitializer<SocketChannel>() {
@@ -141,9 +145,15 @@ public class NettyTcpClient {
                                 if (isSendheartBeat) {
                                     ch.pipeline().addLast("ping", new IdleStateHandler(0, heartBeatInterval, 0, TimeUnit.SECONDS));//5s未发送数据，回调userEventTriggered
                                 }
-                                ch.pipeline().addLast(new StringEncoder(CharsetUtil.UTF_8));
-                                ch.pipeline().addLast(new StringDecoder(CharsetUtil.UTF_8));
-                                ch.pipeline().addLast(new LineBasedFrameDecoder(1024));//黏包处理,需要客户端、服务端配合
+//                                ch.pipeline().addLast(new LineBasedFrameDecoder(1024));//黏包处理
+                                //响应的编码addLast(new ProtobufVarint32LengthFieldPrepender())
+                                ch.pipeline().addLast(new ProtobufVarint32LengthFieldPrependerCustom());
+//                                ch.pipeline().addLast(new ProtobufVarint32LengthFieldPrepender());
+                                ch.pipeline().addLast(new ProtobufEncoder());
+//                                ch.pipeline().addLast(new SecondProtobufCodec());
+                                //请求的解码
+//                                ch.pipeline().addLast(new ProtobufDecoder(FollowersPlus.PBMessage.getDefaultInstance()));
+                                ch.pipeline().addLast(new ProtobufDecoderCustom());
                                 ch.pipeline().addLast(new NettyClientHandler(listener, mIndex, isSendheartBeat, heartBeatData));
                             }
                         });
@@ -207,7 +217,7 @@ public class NettyTcpClient {
     /**
      * 异步发送
      *
-     * @param data 要发送的数据
+     * @param data     要发送的数据
      * @param listener 发送结果回调
      * @return 方法执行结果
      */
@@ -263,10 +273,23 @@ public class NettyTcpClient {
         return flag;
     }
 
+    public boolean sendMsgToServer(FollowersPlus.PBMessage pbMessage, final MessageStateListener listener) {
+        boolean flag = channel != null && isConnect;
+        if (flag) {
+            channel.writeAndFlush(pbMessage).addListener(new ChannelFutureListener() {
+                @Override
+                public void operationComplete(ChannelFuture channelFuture) throws Exception {
+                    listener.isSendSuccss(channelFuture.isSuccess());
+                }
+            });
+        }
+        return flag;
+    }
+
     /**
      * 获取TCP连接状态
      *
-     * @return  获取TCP连接状态
+     * @return 获取TCP连接状态
      */
     public boolean getConnectStatus() {
         return isConnect;
